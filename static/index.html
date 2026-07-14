@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Web 探索测试系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- ═══ 左侧面板 ═══ -->
+        <aside id="sidebar">
+            <div id="sidebar-header">
+                <h1>🤖 AI Web 探索测试</h1>
+                <div class="subtitle">智能体驱动的自动化测试生成平台</div>
+            </div>
+
+            <!-- 任务表单 -->
+            <form id="task-form" onsubmit="submitTask(event)">
+                <div class="form-group">
+                    <label>🌐 目标 URL</label>
+                    <input type="url" id="input-url" placeholder="https://example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>📋 测试要求（自然语言）</label>
+                    <textarea id="input-requirements" placeholder="例如：探索登录功能、验证首页关键元素、测试表单提交流程..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>👤 用户名（可选）</label>
+                        <input type="text" id="input-username" placeholder="登录用户名">
+                    </div>
+                    <div class="form-group">
+                        <label>🔒 密码（可选）</label>
+                        <input type="password" id="input-password" placeholder="登录密码">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>最大探索步数</label>
+                    <input type="number" id="input-max-steps" value="20" min="5" max="50">
+                </div>
+                <button type="submit" class="btn btn-primary" id="btn-submit">🚀 开始探索</button>
+                <div>
+                    <span id="status-badge" class="status-pending" style="display:none;"></span>
+                </div>
+            </form>
+
+            <!-- 任务列表 -->
+            <div id="task-list-section">
+                <h3>📜 任务历史</h3>
+                <div id="task-list"></div>
+            </div>
+        </aside>
+
+        <!-- ═══ 右侧主区域 ═══ -->
+        <main id="main">
+            <!-- 标签页 -->
+            <nav id="tabs">
+                <div class="tab active" data-tab="explore">🔍 探索过程 <span class="badge" id="step-count" style="display:none;">0</span></div>
+                <div class="tab" data-tab="screenshot">📸 页面截图</div>
+                <div class="tab" data-tab="feature">📋 Feature 文件</div>
+                <div class="tab" data-tab="script">🐍 测试脚本</div>
+                <div class="tab" data-tab="pageobject">🧩 Page Object</div>
+                <div class="tab" data-tab="log">📜 执行日志</div>
+            </nav>
+
+            <!-- 内容区 -->
+            <div id="content">
+                <!-- 探索步骤 -->
+                <div class="tab-content active" id="tab-explore">
+                    <div id="steps-panel">
+                        <div class="empty-state" id="empty-explore">
+                            <div class="icon">🔍</div>
+                            <h3>等待探索任务</h3>
+                            <p>在左侧填写目标 URL 和测试要求，点击「开始探索」启动 AI Agent</p>
+                        </div>
+                    </div>
+                    <div id="log-area" style="margin-top:12px;"></div>
+                </div>
+
+                <!-- 截图 -->
+                <div class="tab-content" id="tab-screenshot">
+                    <div id="screenshot-panel">
+                        <div class="empty-state" id="empty-screenshot">
+                            <div class="icon">📸</div>
+                            <h3>暂无截图</h3>
+                            <p>探索开始后，每步操作会自动截图</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 文件 -->
+                <div class="tab-content" id="tab-feature">
+                    <div class="code-header">
+                        <h3>📋 BDD Feature 文件 (Gherkin)</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="copyCode('feature')">📋 复制</button>
+                    </div>
+                    <div class="code-block" id="code-feature">
+                        <span style="color:var(--text2);">等待探索完成后生成...</span>
+                    </div>
+                </div>
+
+                <!-- 测试脚本 -->
+                <div class="tab-content" id="tab-script">
+                    <div class="code-header">
+                        <h3>🐍 自动化测试脚本 (pytest + Playwright)</h3>
+                        <div>
+                            <button class="btn btn-secondary btn-sm" onclick="copyCode('script')">📋 复制</button>
+                            <button class="btn btn-success btn-sm" id="btn-run" onclick="runTests()" style="margin-left:8px;" disabled>▶ 运行脚本</button>
+                        </div>
+                    </div>
+                    <div class="code-block" id="code-script">
+                        <span style="color:var(--text2);">等待探索完成后生成...</span>
+                    </div>
+                </div>
+
+                <!-- Page Object -->
+                <div class="tab-content" id="tab-pageobject">
+                    <div class="code-header">
+                        <h3>🧩 Page Object 类</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="copyCode('pageobject')">📋 复制</button>
+                    </div>
+                    <div class="code-block" id="code-pageobject">
+                        <span style="color:var(--text2);">等待探索完成后生成...</span>
+                    </div>
+                </div>
+
+                <!-- 执行日志 -->
+                <div class="tab-content" id="tab-log">
+                    <div class="code-header">
+                        <h3>📜 脚本执行日志</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="copyCode('log')">📋 复制</button>
+                    </div>
+                    <div class="code-block" id="code-log">
+                        <span style="color:var(--text2);">运行测试脚本后显示执行日志...</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
