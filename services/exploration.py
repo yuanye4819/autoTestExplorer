@@ -140,6 +140,14 @@ async def _run_exploration(task_id: str):
         # Write manifest
         _update_output_manifest(task_id, result)
 
+        # Phase 4.5: Generate checklist
+        try:
+            from services.checklist import generate_checklist
+            result.checklist_content = generate_checklist(result)
+            logger.info(f"[{task_id}] Checklist generated")
+        except Exception as e:
+            logger.debug(f"[{task_id}] Checklist skipped: {e}")
+
         # Phase 5: Mark complete
         result.status = TaskStatus.COMPLETED
         result.completed_at = datetime.now()

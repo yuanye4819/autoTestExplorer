@@ -40,9 +40,7 @@ from tkinter import messagebox
 
 
 
-import urllib.request
 
-import urllib.error
 
 import customtkinter as ctk
 
@@ -112,7 +110,7 @@ FONT_MONO = ("Cascadia Code", "Consolas", "Courier New", "monospace")
 
 
 from desktop.worker import ExplorationWorker
-from desktop.checklist import generate_checklist
+from services.checklist import generate_checklist
 from services.exploration import _derive_page_name
 
 
@@ -123,6 +121,8 @@ from services.exploration import _derive_page_name
 #  Main Desktop Application
 
 # ══════════════════════════════════════════════════════
+
+
 
 
 
@@ -361,30 +361,19 @@ class App(ctk.CTk):
         api_base = self.entry_apibase.get().strip()
         if not api_key:
             from tkinter import messagebox
-            messagebox.showwarning("Missing Key", "Please enter API Key first")
+            messagebox.showwarning("Missing Key", "Please enter API key first")
             return
         if not api_base:
             api_base = "https://api.deepseek.com"
         self.btn_test_ai.configure(text="Testing...", state="disabled")
         self.update()
-        import threading, json, urllib.request, urllib.error
-        def do_test():
-            try:
-                data = json.dumps({"model": self.combo_model.get(), "messages": [{"role":"user","content":"hi"}], "max_tokens":5}).encode()
-                req = urllib.request.Request(api_base.rstrip("/") + "/chat/completions", data=data,
-                    headers={"Authorization":"Bearer "+api_key,"Content-Type":"application/json"})
-                resp = urllib.request.urlopen(req, timeout=15)
-                result = json.loads(resp.read())
-                if "choices" in result:
-                    self._ui_queue.put(("ai_test", ("ok", result["model"])))
-                else:
-                    self._ui_queue.put(("ai_test", ("fail", str(result)[:200])))
-            except urllib.error.HTTPError as e:
-                msg = json.loads(e.read()) if e.fp else {}
-                self._ui_queue.put(("ai_test", ("fail", "HTTP "+str(e.code)+": "+str(msg.get("error",{}).get("message",str(e))))))
-            except Exception as e:
-                self._ui_queue.put(("ai_test", ("fail", str(e)[:200])))
-        threading.Thread(target=do_test, daemon=True).start()
+        model = self.combo_model.get()
+        import threading
+        from services.ai_client import test_connection
+        def _do_test():
+            ok, msg = test_connection(api_key, api_base, model)
+            self._ui_queue.put(("ai_test", ("ok" if ok else "fail", msg)))
+        threading.Thread(target=_do_test, daemon=True).start()
 
 
     def _toggle_ai_settings(self):
@@ -1157,7 +1146,7 @@ class App(ctk.CTk):
         
         self.btn_run.configure(state="normal")
         
-        checklist = generate_checklist(result)
+        checklist = result.checklist_content or generate_checklist(result)
         self.text_checklist.delete("1.0", "end")
         self.text_checklist.insert("1.0", checklist)
         

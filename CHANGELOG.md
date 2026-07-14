@@ -146,3 +146,26 @@
 - models/schemas.py: checklist_content field restored
 - desktop/checklist.py: NEW (95 lines)
 - desktop/__init__.py: __all__ added
+
+
+## [1.4.0] — 2026-07-14
+
+### Code Quality
+
+- **services/ai_client.py** — New shared synchronous AI API client (call_ai, 	est_connection). Replaces 3 scattered implementations in planner.py, desktop_app.py, and checklist.py
+- **services/checklist.py** — Checklist generation moved from desktop/ to services/ (no desktop dependency). desktop/checklist.py is now a thin re-export
+- **exploration pipeline** now generates checklist alongside Feature/Script/PageObject in _run_exploration
+- **desktop_app.py** — Removed dead urllib top-level imports, extracted do_test() nested function to module-level 
+un_ai_test(), uses shared i_client for AI connection test
+- **desktop_app.py:_show_result** — Now reuses pre-generated 
+esult.checklist_content instead of regenerating
+- **desktop/checklist.py:_ai_checklist** — Now uses shared services.ai_client.call_ai() instead of hand-rolled urllib
+
+### File Changes
+
+- services/ai_client.py: NEW (90 lines)
+- services/checklist.py: NEW (125 lines)
+- desktop/checklist.py: 125 → 3 lines (thin re-export)
+- desktop_app.py: removed dead imports, extracted 
+un_ai_test(), uses shared client
+- services/exploration.py: +checklist generation in pipeline
