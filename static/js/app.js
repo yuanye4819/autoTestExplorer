@@ -16,6 +16,16 @@ const state = {
     activeTab: 'explore',
 };
 
+
+// WebSocket reconnection config
+const WS_RECONNECT = {
+    maxRetries: 5,
+    baseDelay: 1000,   // ms
+    maxDelay: 30000,   // ms
+    retryCount: 0,
+    retryTimer: null,
+};
+
 // ── DOM 引用 ────────────────────────────────────────
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -154,7 +164,9 @@ function connectWebSocket(taskId) {
     };
 
     state.ws.onclose = () => {
-        addLog('🔌 WebSocket 已断开\n');
+        addLog('WebSocket disconnected\n');
+        WS_RECONNECT.retryCount = 0;
+        _tryReconnect(taskId);
     };
 }
 
@@ -453,6 +465,24 @@ async function runTests() {
 }
 
 // ── 复制代码 ────────────────────────────────────────
+// WebSocket reconnection with exponential backoff
+function _tryReconnect(taskId) {
+    if (WS_RECONNECT.retryCount >= WS_RECONNECT.maxRetries) {
+        addLog('Max reconnection attempts reached\n');
+        return;
+    }
+    const delay = Math.min(
+        WS_RECONNECT.baseDelay * Math.pow(2, WS_RECONNECT.retryCount),
+        WS_RECONNECT.maxDelay
+    );
+    WS_RECONNECT.retryCount++;
+    addLog('Reconnecting in ' + (delay / 1000) + 's (attempt ' + WS_RECONNECT.retryCount + ')\n');
+    WS_RECONNECT.retryTimer = setTimeout(() => {
+        connectWebSocket(taskId);
+    }, delay);
+}
+
+
 function copyCode(type) {
     let text = '';
     switch (type) {
@@ -467,11 +497,11 @@ function copyCode(type) {
 }
 
 // ── 工具函数 ────────────────────────────────────────
+const _escapeNode = document.createElement('span');
 function escapeHtml(text) {
     if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    _escapeNode.textContent = text;
+    return _escapeNode.innerHTML;
 }
 
 function formatTime(isoStr) {

@@ -131,14 +131,13 @@ class TestRunner:
             }
 
     async def run_with_fallback(self, script_content: str, task_id: str) -> dict:
-        """
-        运行脚本，如果失败则尝试无头模式重试一次
-        """
-        # 第一次：有头模式
+        """Run headless first; retry headed only for debugging visibility."""
+        # First: headless mode (faster, more reliable in CI)
         result = await self.run_test_script(script_content, task_id, headed=False)
 
         if not result["passed"]:
-            await self._write_output("\n🔄 使用无头模式重试...\n")
+            await self._write_output("\nRetrying with headed mode for debugging...\n")
+            # Second: headed mode (useful for visual debugging)
             result = await self.run_test_script(script_content, task_id, headed=True)
 
         return result

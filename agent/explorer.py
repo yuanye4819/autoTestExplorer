@@ -49,16 +49,24 @@ class WebExplorer:
         self.page.set_default_timeout(settings.BROWSER_TIMEOUT)
 
     async def stop(self):
-        """关闭浏览器"""
-        try:
-            if self.context:
+        """Close browser - log errors per step instead of swallowing"""
+        import logging
+        _log = logging.getLogger("autotest")
+        if self.context:
+            try:
                 await self.context.close()
-            if self.browser:
+            except Exception as e:
+                _log.warning(f"Error closing browser context: {e}")
+        if self.browser:
+            try:
                 await self.browser.close()
-            if hasattr(self, "_pw") and self._pw:
+            except Exception as e:
+                _log.warning(f"Error closing browser: {e}")
+        if hasattr(self, "_pw") and self._pw:
+            try:
                 await self._pw.stop()
-        except Exception:
-            pass
+            except Exception as e:
+                _log.warning(f"Error stopping playwright: {e}")
 
     def on_step(self, callback: Callable):
         """设置步骤回调"""
@@ -95,8 +103,11 @@ class WebExplorer:
         # step starts
 
         try:
-            await self.page.goto(url, wait_until="domcontentloaded")
-            await asyncio.sleep(2)  # 等待动态内容
+            await self.page.goto(url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT)
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass  # 等待动态内容
             step.status = StepStatus.SUCCESS
             await self._log(f"✓ 成功导航到 {url}")
         except Exception as e:

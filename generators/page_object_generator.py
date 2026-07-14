@@ -6,24 +6,7 @@ from __future__ import annotations
 from models.schemas import ExploreStep, StepAction, ElementLocator
 
 
-def _generate_playwright_locator(locator: ElementLocator) -> str:
-    """将 ElementLocator 转换为 Playwright 定位代码"""
-    if locator.test_id:
-        return f'page.get_by_test_id("{locator.test_id}")'
-    if locator.label:
-        return f'page.get_by_label("{locator.label}")'
-    if locator.placeholder:
-        return f'page.get_by_placeholder("{locator.placeholder}")'
-    if locator.role and locator.name:
-        return f'page.get_by_role("{locator.role}", name="{locator.name}")'
-    if locator.text:
-        return f'page.get_by_text("{locator.text}")'
-    if locator.css:
-        return f'page.locator("{locator.css}")'
-    if locator.xpath:
-        return f'page.locator("xpath={locator.xpath}")'
-    return 'page.locator("body")'
-
+from generators._locator_utils import generate_playwright_locator
 
 def _generate_method_name(action: StepAction, description: str, locator: ElementLocator = None) -> str:
     """生成语义化的方法名"""
@@ -96,7 +79,7 @@ def generate_page_object(steps: list[ExploreStep], page_name: str = "BasePage") 
             count += 1
         element_props.append(prop_name)
 
-        loc_code = _generate_playwright_locator(loc)
+        loc_code = generate_playwright_locator(loc)
         lines.append(f'    @property')
         lines.append(f'    def {prop_name}(self):')
         comment = loc.name or loc.label or loc.placeholder or loc.selector

@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Optional, Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 # ── 枚举 ─────────────────────────────────────────────
@@ -97,7 +97,7 @@ class ExplorationTask(BaseModel):
     target_url: str
     requirements: str = ""                  # 自然语言测试要求
     username: Optional[str] = None          # 登录凭据
-    password: Optional[str] = None
+    password: Optional[SecretStr] = None    # SecretStr: 防止日志/序列化泄露
     custom_headers: dict[str, str] = Field(default_factory=dict)
     max_steps: int = 30
     explore_domain_only: bool = True        # 是否仅探索同域
@@ -134,10 +134,7 @@ class WSMessage(BaseModel):
 class CreateTaskRequest(BaseModel):
     target_url: str
     requirements: str = ""
-    username: Optional[str] = None
-    password: Optional[str] = None
     max_steps: int = 30
-
 
 class TaskSummary(BaseModel):
     id: str

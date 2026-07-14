@@ -1,54 +1,114 @@
-"""
-全局配置模块 — 管理系统所有可配置项
-"""
+"""Global configuration — supports environment variable override with AUTOTEST_ prefix."""
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
-class Settings(BaseSettings):
-    """系统配置，支持环境变量覆盖"""
-
-    # 项目根目录
-    PROJECT_ROOT: Path = Path(__file__).parent.resolve()
-
-    # 输出目录
-    OUTPUT_DIR: Path = PROJECT_ROOT / "output"
-    LOG_DIR: Path = PROJECT_ROOT / "logs"
-
-    # 服务配置
+class ServerConfig(BaseSettings):
+    """HTTP server settings."""
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # Playwright 配置
-    BROWSER_HEADLESS: bool = True           # 探索时是否无头模式（默认 True，有桌面可改 False）
-    BROWSER_TIMEOUT: int = 30_000           # 页面操作超时 (ms)
-    BROWSER_SLOW_MO: int = 300              # 操作间隔慢放 (ms)，便于观察
 
-    # Agent 配置
-    AGENT_MAX_STEPS: int = 30               # 单任务最大探索步数
-    AGENT_STEP_DELAY: float = 1.0           # 步骤间等待时间
-    AGENT_ELEMENT_WAIT: int = 10_000        # 元素等待超时 (ms)
+class BrowserConfig(BaseSettings):
+    """Playwright browser settings."""
+    HEADLESS: bool = True
+    TIMEOUT: int = 30_000
+    SLOW_MO: int = 300
 
-    # AI 配置 (可通过环境变量覆盖)
-    AI_API_KEY: str = ""                          # DeepSeek / OpenAI API Key，或设环境变量 AUTOTEST_AI_API_KEY
-    AI_API_BASE: str = "https://api.deepseek.com"  # 默认 DeepSeek；OpenAI 用 "https://api.openai.com/v1"
-    AI_MODEL: str = "deepseek-v4-pro"               # DeepSeek V4 Pro；OpenAI 用 gpt-4o / gpt-4o-mini
-    AI_MAX_TOKENS: int = 1024
-    AI_TEMPERATURE: float = 0.3
 
-    # 安全配置
+class AgentConfig(BaseSettings):
+    """Exploration agent settings."""
+    MAX_STEPS: int = 30
+    STEP_DELAY: float = 1.0
+    ELEMENT_WAIT: int = 10_000
+
+
+class AIConfig(BaseSettings):
+    """AI / LLM settings."""
+    API_KEY: str = ""
+    API_BASE: str = "https://api.deepseek.com"
+    MODEL: str = "deepseek-v4-pro"
+    MAX_TOKENS: int = 1024
+    TEMPERATURE: float = 0.3
+
+
+class SecurityConfig(BaseSettings):
+    """Security settings."""
     MAX_CONCURRENT_TASKS: int = 5
-    ALLOWED_DOMAINS: list[str] = []         # 空白名单 = 允许所有
+    ALLOWED_DOMAINS: list[str] = []
 
-    # 数据库
-    DATABASE_URL: str = f"sqlite+aiosqlite:///{PROJECT_ROOT}/data.db"
 
-    model_config = {"env_prefix": "AUTOTEST_", "env_file": ".env"}
+class DatabaseConfig(BaseSettings):
+    """Database settings."""
+    URL: str = ""
+
+
+class Settings(BaseSettings):
+    """Top-level settings aggregator."""
+    PROJECT_ROOT: Path = Path(__file__).parent.resolve()
+    OUTPUT_DIR: Path = PROJECT_ROOT / "output"
+    LOG_DIR: Path = PROJECT_ROOT / "logs"
+
+    server: ServerConfig = ServerConfig()
+    browser: BrowserConfig = BrowserConfig()
+    agent: AgentConfig = AgentConfig()
+    ai: AIConfig = AIConfig()
+    security: SecurityConfig = SecurityConfig()
+    database: DatabaseConfig = DatabaseConfig()
+
+    # Backward-compatible flat accessors
+    @property
+    def HOST(self): return self.server.HOST
+    @property
+    def PORT(self): return self.server.PORT
+    @property
+    def BROWSER_HEADLESS(self): return self.browser.HEADLESS
+    @property
+    def BROWSER_TIMEOUT(self): return self.browser.TIMEOUT
+    @property
+    def BROWSER_SLOW_MO(self): return self.browser.SLOW_MO
+    @property
+    def AGENT_MAX_STEPS(self): return self.agent.MAX_STEPS
+    @property
+    def AGENT_STEP_DELAY(self): return self.agent.STEP_DELAY
+    @property
+    def AGENT_ELEMENT_WAIT(self): return self.agent.ELEMENT_WAIT
+    @property
+    def AI_API_KEY(self): return self.ai.API_KEY
+    @AI_API_KEY.setter
+    def AI_API_KEY(self, value): self.ai.API_KEY = value
+
+    @property
+    def AI_API_BASE(self): return self.ai.API_BASE
+    @AI_API_BASE.setter
+    def AI_API_BASE(self, value): self.ai.API_BASE = value
+
+    @property
+    def AI_MODEL(self): return self.ai.MODEL
+    @AI_MODEL.setter
+    def AI_MODEL(self, value): self.ai.MODEL = value
+    @property
+    def AI_MAX_TOKENS(self): return self.ai.MAX_TOKENS
+    @property
+    def AI_TEMPERATURE(self): return self.ai.TEMPERATURE
+    @property
+    def MAX_CONCURRENT_TASKS(self): return self.security.MAX_CONCURRENT_TASKS
+    @property
+    def ALLOWED_DOMAINS(self): return self.security.ALLOWED_DOMAINS
+    @property
+    def DATABASE_URL(self): return self.database.URL
+
+    model_config = {"env_prefix": "AUTOTEST_", "env_file": ".env", "env_nested_delimiter": "__"}
 
 
 settings = Settings()
 
-# 确保必要目录存在
+# Ensure required directories exist
 settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 settings.LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# Legacy: set DATABASE_URL for backward compat
+settings.database.URL = f"sqlite+aiosqlite:///{settings.PROJECT_ROOT}/data.db"

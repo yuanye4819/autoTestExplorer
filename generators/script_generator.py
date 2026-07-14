@@ -9,23 +9,7 @@ from datetime import datetime
 from models.schemas import ExploreStep, StepAction, ElementLocator, ExplorationTask
 
 
-def _generate_playwright_locator(locator: ElementLocator) -> str:
-    """将 ElementLocator 转换为 Playwright 定位代码"""
-    if locator.test_id:
-        return f'page.get_by_test_id("{locator.test_id}")'
-    if locator.label:
-        return f'page.get_by_label("{locator.label}")'
-    if locator.placeholder:
-        return f'page.get_by_placeholder("{locator.placeholder}")'
-    if locator.role and locator.name:
-        return f'page.get_by_role("{locator.role}", name="{locator.name}")'
-    if locator.text:
-        return f'page.get_by_text("{locator.text}")'
-    if locator.css:
-        return f'page.locator("{locator.css}")'
-    if locator.xpath:
-        return f'page.locator("xpath={locator.xpath}")'
-    return 'page.locator("body")'
+from generators._locator_utils import generate_playwright_locator
 
 
 def _is_password_field(step: ExploreStep) -> bool:
@@ -64,13 +48,13 @@ def _step_to_pytest_code(step: ExploreStep, indent: str = "    ") -> list[str]:
 
     elif action == StepAction.CLICK:
         if step.locator:
-            loc_code = _generate_playwright_locator(step.locator)
+            loc_code = generate_playwright_locator(step.locator)
             lines.append(f"{indent}{loc_code}.wait_for(state='visible', timeout=10000)")
             lines.append(f"{indent}{loc_code}.click()")
 
     elif action == StepAction.FILL:
         if step.locator:
-            loc_code = _generate_playwright_locator(step.locator)
+            loc_code = generate_playwright_locator(step.locator)
             lines.append(f"{indent}{loc_code}.wait_for(state='visible', timeout=10000)")
             value = _escape_py_string(step.value or "")
             # 密码字段脱敏：生成环境变量引用
@@ -82,23 +66,23 @@ def _step_to_pytest_code(step: ExploreStep, indent: str = "    ") -> list[str]:
 
     elif action == StepAction.SELECT:
         if step.locator:
-            loc_code = _generate_playwright_locator(step.locator)
+            loc_code = generate_playwright_locator(step.locator)
             value = _escape_py_string(step.value or "")
             lines.append(f'{indent}{loc_code}.select_option("{value}")')
 
     elif action == StepAction.CHECK:
         if step.locator:
-            loc_code = _generate_playwright_locator(step.locator)
+            loc_code = generate_playwright_locator(step.locator)
             lines.append(f"{indent}{loc_code}.check()")
 
     elif action == StepAction.HOVER:
         if step.locator:
-            loc_code = _generate_playwright_locator(step.locator)
+            loc_code = generate_playwright_locator(step.locator)
             lines.append(f"{indent}{loc_code}.hover()")
 
     elif action == StepAction.ASSERT_VISIBLE:
         if step.locator:
-            loc_code = _generate_playwright_locator(step.locator)
+            loc_code = generate_playwright_locator(step.locator)
             lines.append(f"{indent}{loc_code}.wait_for(state='visible', timeout=10000)")
             lines.append(f"{indent}expect({loc_code}).to_be_visible()")
 
