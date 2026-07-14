@@ -112,23 +112,8 @@ FONT_MONO = ("Cascadia Code", "Consolas", "Courier New", "monospace")
 
 
 from desktop.worker import ExplorationWorker
-
-def _derive_page_name(url: str) -> str:
-
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-
-    host = parsed.netloc.replace("www.", "").split(".")[0]
-
-    path = parsed.path.strip("/").replace("/", "_").replace("-", "_")
-
-    if path:
-
-        return f"{host.capitalize()}_{path.capitalize()}Page"
-
-    return f"{host.capitalize()}Page"
-
+from desktop.checklist import generate_checklist
+from services.exploration import _derive_page_name
 
 
 
@@ -1118,270 +1103,6 @@ class App(ctk.CTk):
 
 
 
-    def _generate_checklist(self, result: TaskResult) -> str:
-
-        """Generate a site feature checklist from exploration 步"""
-
-        # Collect raw data
-
-        pages = []
-
-        clicks = []
-
-        fills = []
-
-        for s in result.步:
-
-            if s.status.value != "success":
-
-                continue
-
-            if s.action.value == "navigate":
-
-                pages.append(s.value or "")
-
-            elif s.action.value == "click":
-
-                clicks.append(s.description)
-
-            elif s.action.value in ("fill", "select"):
-
-                fills.append(s.description)
-
-            elif s.action.value.startswith("assert"):
-
-                pass  # assertions are verification, not features
-
-
-
-        unique_pages = list(dict.fromkeys(pages))
-
-
-
-        # Try AI summary first
-
-        if settings.AI_API_KEY:
-
-            ai_checklist = self._ai_checklist(unique_pages, clicks, fills)
-
-            if ai_checklist:
-
-                return ai_checklist
-
-
-
-        # Fallback: heuristic grouping
-
-        return self._heuristic_checklist(unique_pages, clicks, fills)
-
-
-
-    def _ai_checklist(self, pages: list, clicks: list, fills: list) -> str:
-
-        """Use AI to summarize site features"""
-
-        import urllib.request, urllib.error, json
-
-        try:
-
-            summary = chr(10).join([
-
-                "Pages visited: " + ", ".join(pages[:10]),
-
-                "Actions performed: " + ", ".join(clicks[:15]),
-
-                "Form fields used: " + ", ".join(fills[:10]),
-
-            ])
-
-            prompt = f"""Analyze this web exploration data and produce a site feature checklist in Chinese.
-
-Group features by business module (e.g. user management, data management, settings).
-
-
-
-Return ONLY a numbered list, one feature per line. Format: "ModuleName: feature description"
-
-
-
-{summary}"""
-
-
-
-            data = json.dumps({
-
-                "model": settings.AI_MODEL,
-
-                "messages": [
-
-                    {"role":"system","content":"You are a QA analyst. Output only the checklist, no explanation."},
-
-                    {"role":"user","content": prompt},
-
-                ],
-
-                "max_tokens": 500, "temperature": 0.3,
-
-            }).encode("utf-8")
-
-
-
-            req = urllib.request.Request(
-
-                settings.AI_API_BASE.rstrip("/") + "/chat/completions",
-
-                data=data,
-
-                headers={"Authorization":"Bearer "+settings.AI_API_KEY,"Content-Type":"application/json"},
-
-            )
-
-            resp = urllib.request.urlopen(req, timeout=20)
-
-            result = json.loads(resp.read())
-
-            content = result["choices"][0]["message"]["content"].strip()
-
-
-
-            lines = []
-
-            lines.append("Site Feature Checklist (AI)")
-
-            lines.append("=" * 50)
-
-            lines.append("")
-
-            for line in content.splitlines():
-
-                line = line.strip()
-
-                if line:
-
-                    lines.append(line)
-
-            lines.append("")
-
-            lines.append("-" * 50)
-
-            lines.append("Based on " + str(len(pages)) + " pages explored")
-
-            return chr(10).join(lines)
-
-        except Exception:
-
-            return ""
-
-
-
-    def _heuristic_checklist(self, pages: list, clicks: list, fills: list) -> str:
-
-        """Fallback: group features heuristically"""
-
-        from collections import OrderedDict
-
-        modules = OrderedDict()
-
-
-
-        # Keyword-based module grouping
-
-        rules = {
-
-            "login": "Login", "register": "Registration",
-
-            "add": "Data Entry", "create": "Data Entry", "new": "Data Entry",
-
-            "edit": "Data Editing", "update": "Data Editing", "modify": "Data Editing",
-
-            "delete": "Data Deletion", "remove": "Data Deletion",
-
-            "search": "Search", "filter": "Search", "query": "Search",
-
-            "upload": "File Management", "download": "File Management",
-
-            "save": "Data Persistence", "submit": "Form Submission",
-
-            "setting": "Settings", "config": "Settings", "profile": "User Profile",
-
-        }
-
-
-
-        for action in clicks + fills:
-
-            al = action.lower()
-
-            clean = action
-
-            for prefix in ("click ", "fill ", "select ", "navigate to: "):
-
-                if clean.lower().startswith(prefix):
-
-                    clean = clean[len(prefix):]
-
-            clean = clean.strip().strip("'").strip('"').strip(".")
-
-            if len(clean) < 2:
-
-                continue
-
-            found = False
-
-            for kw, module in rules.items():
-
-                if kw in al:
-
-                    modules.setdefault(module, []).append(clean)
-
-                    found = True
-
-                    break
-
-            if not found:
-
-                modules.setdefault("Other", []).append(clean)
-
-
-
-        lines = []
-
-        lines.append("Site Feature Checklist")
-
-        lines.append("=" * 50)
-
-        lines.append("")
-
-        for module, acts in modules.items():
-
-            lines.append(module)
-
-            lines.append("-" * 30)
-
-            seen = set()
-
-            for a in acts:
-
-                short = a[:80].strip()
-
-                if short and short not in seen:
-
-                    seen.add(short)
-
-                    lines.append("  - " + short)
-
-            lines.append("")
-
-        lines.append("-" * 50)
-
-        lines.append("Pages explored: " + str(len(pages)))
-
-        return chr(10).join(lines)
-
-
-
-
-
     def _show_result(self, result: TaskResult):
 
         self._current_result = result
@@ -1412,7 +1133,7 @@ Return ONLY a numbered list, one feature per line. Format: "ModuleName: feature 
 
         # Generate site feature checklist
 
-        checklist = self._generate_checklist(result)
+        checklist = generate_checklist(result)
         result.checklist_content = checklist
 
         self.text_checklist.delete("1.0", "end")
@@ -1436,7 +1157,7 @@ Return ONLY a numbered list, one feature per line. Format: "ModuleName: feature 
         
         self.btn_run.configure(state="normal")
         
-        checklist = self._generate_checklist(result)
+        checklist = generate_checklist(result)
         self.text_checklist.delete("1.0", "end")
         self.text_checklist.insert("1.0", checklist)
         

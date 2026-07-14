@@ -72,6 +72,13 @@
 - **移除默认明文密码。** `config.py` 中 `DatabaseConfig.PASSWORD` 默认值从 "123456" 改为空字符串，要求通过环境变量显式配置。
 - **`_init()` 线程安全。** 添加 `threading.Lock`，保护数据库引擎初始化过程。
 
+## [1.2.3] — 2026-07-14
+
+### Bug Fixes
+
+- **`_migrate_if_needed` 已调用。** 数据库迁移函数之前在 `_init()` 中未实际执行，现已补上调用。
+- **重复导入清理。** `services/db.py` 删除未使用的 `db_text` 别名；`routes/tasks.py` 删除函数内重复的 `from datetime import datetime`。
+
 ## [1.2.2] — 2026-07-14
 
 ### Bug Fixes
@@ -86,3 +93,56 @@
 
 - **步骤实时反馈恢复。** `agent/explorer.py` 恢复每个操作开始时发送 RUNNING 状态通知，桌面端 `_add_step` 通过 index 去重更新卡片而非重复追加。
 - **测试适配。** `test_create_task_request_no_password` 更新为验证 password/username 默认空字符串，适配新的 API 字段。
+
+
+## [1.3.0] - 2026-07-14
+
+### Database Schema v2
+
+- **tasks** - Added config_json (task configuration), metrics_json (aggregated step metrics), updated_at timestamp. Indexes on status and created_at
+- **task_steps** - Added 	imestamp column for per-step timing. Added UNIQUE constraint on (task_id, step_index). Added composite index on (task_id, step_index) and index on status
+- **task_screenshots** - Removed redundant url/	itle/element_count columns (data lives in task_steps). Added created_at timestamp and composite index on (task_id, step_index)
+- **task_artifacts** - Added composite index on (task_id, artifact_type)
+- **schema_version** - New table for tracking database migrations (v2)
+
+### New Features
+
+- **list_task_summaries()** - Lightweight task listing without loading steps/screenshots/artifacts. Uses text-based queries for backward compatibility with existing databases
+- **get_task_count()** - Returns total task count, optionally filtered by status
+- **delete_task()** - Cascading delete of a task and all related data
+- **Auto-migration** - _migrate_if_needed() detects and adds missing columns on startup, so existing databases upgrade seamlessly
+
+### Connection Pool
+
+- MySQL connections now use QueuePool with pool_size=8, max_overflow=4, pool_recycle=3600, pool_pre_ping=True, pool_timeout=10
+
+### Performance
+
+- route list_tasks updated to use lightweight list_task_summaries() query instead of loading all tasks into memory
+
+
+## [1.3.1] — 2026-07-14
+
+### Deduplication
+
+- **_derive_page_name** removed from desktop_app.py, now imported from services.exploration. The old version was also less robust (no regex cleaning)
+- **_esc** eliminated duplicated implementation: nalyzer.py now imports from generators/_locator_utils instead of maintaining a nested copy
+
+### Checklist Feature Restored
+
+- **checklist_content** field restored to TaskResult model. DB save/load restored for checklist artifact
+- **desktop/checklist.py** new module extracted from desktop_app.py: generate_checklist(), _ai_checklist(), _heuristic_checklist(). Now importable from both desktop and web code paths
+
+### Infrastructure
+
+- **_migrate_if_needed()** now also migrates 	ask_steps.timestamp column for v1 databases
+- **desktop/__init__.py** added __all__ exports for cleaner namespace
+
+### File Changes
+
+- desktop_app.py: −18 lines (duplicated function removed, checklist extracted)
+- gent/analyzer.py: −3 lines (nested _esc removed, imports from shared module)
+- services/db.py: +checklist artifact save/load restored
+- models/schemas.py: checklist_content field restored
+- desktop/checklist.py: NEW (95 lines)
+- desktop/__init__.py: __all__ added

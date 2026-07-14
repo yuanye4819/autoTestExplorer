@@ -156,6 +156,7 @@ async def analyze_page(page: Page) -> PageSnapshot:
 
 
 def build_locator(element: dict) -> ElementLocator:
+    from generators._locator_utils import _esc
     """
     优先级: data-* > id > label > placeholder > role+name > text > css
     """
