@@ -28,3 +28,6 @@ pytest-playwright>=0.4.0
 sqlalchemy>=2.0
 pymysql>=1.1.0
 aiomysql>=0.3.0
+
+# OCR (optional, for CAPTCHA solving)
+pytesseract>=0.3.0

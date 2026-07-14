@@ -32,6 +32,7 @@ class WebExplorer:
         self._on_log: Optional[Callable] = None
         self._current_screenshot: Optional[str] = None
         self._steps: list[ExploreStep] = []
+        self._captcha_needed: bool = False
 
     async def start(self):
         """启动浏览器"""
@@ -291,6 +292,21 @@ class WebExplorer:
             ploc = build_locator(pf)
             await self.fill_input(ploc, password, "填入密码")
 
+            # CAPTCHA check
+            captcha = await self.detect_captcha()
+            if captcha is not None:
+                await self._log("CAPTCHA detected, trying OCR...")
+                captcha_text = ""
+                if captcha:
+                    captcha_text = await self.solve_captcha_ocr(captcha)
+                if captcha_text:
+                    await self.fill_captcha(captcha_text)
+                    await self._log("OCR solved: " + captcha_text)
+                else:
+                    await self._log("OCR failed, manual input needed")
+                    self._captcha_needed = True
+                    return False
+
             # 点击登录
             if sb:
                 bloc = build_locator(sb)
@@ -302,6 +318,67 @@ class WebExplorer:
         except Exception as e:
             await self._log(f"✗ 自动登录失败: {e}")
             return False
+
+    # ── 验证码处理 ─────────────────────────────────
+
+    async def detect_captcha(self) -> str | None:
+        """检测页面上是否存在验证码输入框，返回验证码图片的 base64 或 None"""
+        captcha_keywords = ["captcha", "验证码", "verification code", "vercode", "code"]
+        snapshot = await self.get_snapshot()
+        for el in snapshot.interactive_elements:
+            combined = (el.get("name", "") + el.get("label", "") + el.get("placeholder", "") + el.get("id", "")).lower()
+            if any(kw in combined for kw in captcha_keywords):
+                # Found a captcha input — try to find the captcha image nearby
+                try:
+                    # Look for img elements near the captcha input
+                    img = await self.page.locator('img[src*="captcha"], img[src*="code"], img[src*="verify"]').first
+                    if await img.count() > 0:
+                        return await img.screenshot(type="png")
+                except Exception:
+                    pass
+                # Fallback: return empty string (captcha exists but no image found)
+                return ""
+        return None
+
+    async def solve_captcha_ocr(self, image_b64: str) -> str:
+        """Try OCR via Tesseract, fallback to AI."""
+        try:
+            import pytesseract
+            from PIL import Image
+            import io, base64
+            img_data = base64.b64decode(image_b64)
+            import os as _os
+            if _os.path.exists(r"D:\Tesseract-OCR\tesseract.exe"):
+                pytesseract.pytesseract.tesseract_cmd = r"D:\Tesseract-OCR\tesseract.exe"
+            img = Image.open(io.BytesIO(img_data))
+            text = pytesseract.image_to_string(
+                img, config='--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+            ).strip()
+            if text:
+                return text
+        except Exception:
+            pass
+        # AI fallback
+        try:
+            from services.ai_client import call_ai
+            text = call_ai(
+                prompt="Read this CAPTCHA text, return only the characters",
+                system="You are OCR. Output only the text.", max_tokens=20, timeout=10)
+            return text.strip() if text else ""
+        except Exception:
+            return ""
+
+    async def fill_captcha(self, value: str) -> bool:
+        """Fill the detected captcha input with the given value."""
+        snapshot = await self.get_snapshot()
+        captcha_keywords = ["captcha", "验证码", "vercode"]
+        for el in snapshot.interactive_elements:
+            combined = (el.get("name", "") + el.get("label", "") + el.get("placeholder", "") + el.get("id", "")).lower()
+            if any(kw in combined for kw in captcha_keywords):
+                loc = build_locator(el)
+                await self.fill_input(loc, value, f"输入验证码 '{value}'")
+                return True
+        return False
 
     # ── 内部方法 ────────────────────────────────────
 
