@@ -9,7 +9,7 @@ import logging
 import threading
 from datetime import datetime
 
-from sqlalchemy import (
+from sqlalchemy import (text as _sa_text,
     create_engine, Column, String, Integer, Text, LargeBinary,
     MetaData, Table, ForeignKey, UniqueConstraint, Index, inspect,
 )
@@ -28,6 +28,30 @@ _tables: dict[str, Table] = {}
 _initialized = False
 _lock = threading.Lock()
 _db_type = "sqlite"  # detected at init time
+
+
+
+def _migrate_if_needed(engine):
+    inspector = inspect(engine)
+    existing = inspector.get_columns("tasks")
+    col_names = {c["name"] for c in existing}
+    with engine.connect() as conn:
+        if "config_json" not in col_names:
+            conn.execute(_sa_text("ALTER TABLE tasks ADD COLUMN config_json TEXT DEFAULT '{}'"))
+            logger.info("Migrated: tasks.config_json")
+        if "metrics_json" not in col_names:
+            conn.execute(_sa_text("ALTER TABLE tasks ADD COLUMN metrics_json TEXT DEFAULT '{}'"))
+            logger.info("Migrated: tasks.metrics_json")
+        if "updated_at" not in col_names:
+            conn.execute(_sa_text("ALTER TABLE tasks ADD COLUMN updated_at TEXT"))
+            logger.info("Migrated: tasks.updated_at")
+
+        existing_steps = inspector.get_columns("task_steps")
+        step_cols = {c["name"] for c in existing_steps}
+        if "timestamp" not in step_cols:
+            conn.execute(_sa_text("ALTER TABLE task_steps ADD COLUMN timestamp TEXT"))
+            logger.info("Migrated: task_steps.timestamp")
+        conn.commit()
 
 
 def _init():
@@ -130,6 +154,7 @@ def _init():
                     )
 
                 metadata.create_all(engine, checkfirst=True)
+                _migrate_if_needed(engine)
 
                 # Record schema version
                 with engine.connect() as conn:
@@ -239,9 +264,11 @@ def save_task(result: TaskResult):
         _insert_artifact(session, tid, "script", result.test_script)
         _insert_artifact(session, tid, "pageobject", result.page_object_code)
         _insert_artifact(session, tid, "log", result.execution_log)
+        _insert_artifact(session, tid, "checklist", getattr(result, "checklist_content", ""))
 
         session.commit()
-        logger.info(f"[{tid}] Saved: {total_steps} steps, {metrics.count(chr(115)+chr(99)+chr(114)+chr(101)+chr(101)+chr(110)+chr(115)+chr(104)+chr(111)+chr(116))}")
+        num_ss = sum(1 for s in result.steps if s.screenshot_b64)
+        logger.info(f"[{tid}] Saved: {total_steps} steps, {success_steps} ok, {num_ss} screenshots, {total_duration}ms")
     except Exception as e:
         session.rollback()
         logger.warning(f"DB save failed: {e}")
@@ -257,7 +284,7 @@ def load_all_tasks() -> dict:
     tasks = {}
     session = _Session()
     try:
-        task_rows = session.execute(_tables["tasks"].select().order_by("created_at")).fetchall()
+        task_rows = session.execute(_sa_text("SELECT id, target_url, requirements, status, step_count, created_at, completed_at FROM tasks ORDER BY created_at")).fetchall()
         for t in task_rows:
             tid = t.id
 
@@ -299,12 +326,13 @@ def load_all_tasks() -> dict:
                 .order_by("artifact_type")
             ).fetchall()
 
-            feature = script = pageobject = log = ""
+            feature = script = pageobject = log = checklist = ""
             for a in art_rows:
                 if a.artifact_type == "feature": feature = a.content or ""
                 elif a.artifact_type == "script": script = a.content or ""
                 elif a.artifact_type == "pageobject": pageobject = a.content or ""
                 elif a.artifact_type == "log": log = a.content or ""
+                elif a.artifact_type == "checklist": checklist = a.content or ""
 
             task = ExplorationTask(id=tid, target_url=t.target_url, requirements=t.requirements or "")
             result = TaskResult(
@@ -331,11 +359,9 @@ def list_task_summaries(limit: int = 50, offset: int = 0, status_filter: str | N
     results = []
     session = _Session()
     try:
-        query = _tables["tasks"].select().order_by(_tables["tasks"].c.created_at.desc())
-        if status_filter:
-            query = query.where(_tables["tasks"].c.status == status_filter)
-        query = query.limit(limit).offset(offset)
-        rows = session.execute(query).fetchall()
+        query = _sa_text("SELECT id, target_url, requirements, status, step_count, created_at, completed_at FROM tasks ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+        params = {"limit": limit, "offset": offset}
+        rows = session.execute(query, params).fetchall()
         for t in rows:
             results.append({
                 "id": t.id,
@@ -345,7 +371,7 @@ def list_task_summaries(limit: int = 50, offset: int = 0, status_filter: str | N
                 "step_count": t.step_count or 0,
                 "created_at": t.created_at,
                 "completed_at": t.completed_at,
-                "metrics": _json.loads(t.metrics_json) if t.metrics_json else {},
+                "metrics": {},
             })
     except Exception as e:
         logger.warning(f"List summaries failed: {e}")

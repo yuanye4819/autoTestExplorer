@@ -13,7 +13,7 @@ from models.schemas import (
 )
 from state import tasks_store, ws_connections, agent, test_runner
 from services.exploration import _guarded_exploration
-from services.db import save_task
+from services.db import save_task, list_task_summaries
 
 router = APIRouter()
 
@@ -51,19 +51,21 @@ async def create_task(req: CreateTaskRequest):
 
 
 @router.get("/api/tasks", response_model=list[TaskSummary])
-async def list_tasks():
+async def list_tasks(limit: int = 50, offset: int = 0):
+    """List tasks using lightweight DB query (no steps/screenshots loaded)."""
+    rows = list_task_summaries(limit=limit, offset=offset)
     summaries = []
-    for tid, result in tasks_store.items():
+    for r in rows:
         summaries.append(TaskSummary(
-            id=tid,
-            target_url=result.task.target_url,
-            requirements=result.task.requirements,
-            status=result.status,
-            step_count=len(result.steps),
-            created_at=result.created_at,
-            completed_at=result.completed_at,
+            id=r['id'],
+            target_url=r['target_url'],
+            requirements=r.get('requirements', ''),
+            status=r['status'],
+            step_count=r.get('step_count', 0),
+            created_at=datetime.fromisoformat(r['created_at']) if r.get('created_at') else datetime.now(),
+            completed_at=datetime.fromisoformat(r['completed_at']) if r.get('completed_at') else None,
         ))
-    return sorted(summaries, key=lambda s: s.created_at, reverse=True)
+    return summaries
 
 
 @router.get("/api/tasks/{task_id}")

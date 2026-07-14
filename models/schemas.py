@@ -115,6 +115,7 @@ class TaskResult(BaseModel):
     page_object_code: str = ""              # Page Object 代码
     execution_log: str = ""                 # 脚本执行日志
     execution_passed: bool = False
+    checklist_content: str = ""         # site feature checklist
     created_at: datetime = Field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
 
