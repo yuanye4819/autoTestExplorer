@@ -9,16 +9,7 @@ from datetime import datetime
 from models.schemas import ExploreStep, StepAction, ElementLocator, ExplorationTask
 
 
-from generators._locator_utils import generate_playwright_locator
-
-
-def _is_password_field(step: ExploreStep) -> bool:
-    if not step.locator:
-        return False
-    keywords = ["password", "pass", "pwd", "密码"]
-    combined = (step.locator.name or "") + " " + (step.locator.label or "") + " " + (step.locator.placeholder or "") + " " + (step.locator.selector or "")
-    combined = combined.lower()
-    return any(kw in combined for kw in keywords)
+from generators._locator_utils import generate_playwright_locator, is_password_field
 
 
 def _escape_py_string(s: str) -> str:
@@ -58,7 +49,7 @@ def _step_to_pytest_code(step: ExploreStep, indent: str = "    ") -> list[str]:
             lines.append(f"{indent}{loc_code}.wait_for(state='visible', timeout=10000)")
             value = _escape_py_string(step.value or "")
             # 密码字段脱敏：生成环境变量引用
-            if _is_password_field(step):
+            if is_password_field(step.locator):
                 lines.append(f'{indent}{loc_code}.fill(os.environ.get("TEST_PASSWORD", ""))')
                 lines.append(f"{indent}# 密码字段 — 请设置环境变量 TEST_PASSWORD")
             else:

@@ -159,6 +159,9 @@ def build_locator(element: dict) -> ElementLocator:
     """
     优先级: data-* > id > label > placeholder > role+name > text > css
     """
+    def _esc(s: str) -> str:
+        return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+
     loc = ElementLocator(strategy="auto")
     tag = element.get("tag", "")
     el_id = element.get("id", "")
@@ -173,32 +176,32 @@ def build_locator(element: dict) -> ElementLocator:
     if test_id:
         loc.strategy = "testid"
         loc.test_id = test_id
-        loc.selector = '[data-testid="' + test_id + '"]'
+        loc.selector = '[data-testid="' + _esc(test_id) + '"]'
     elif data_attr:
         loc.strategy = "css"
         loc.css = "[" + data_attr + "]"
         loc.selector = "[" + data_attr + "]"
     elif el_id:
         loc.strategy = "css"
-        loc.css = "#" + el_id
-        loc.selector = "#" + el_id
+        loc.css = "#" + _esc(el_id)
+        loc.selector = "#" + _esc(el_id)
     elif label:
         loc.strategy = "label"
         loc.label = label
-        loc.selector = 'getByLabel("' + label + '")'
+        loc.selector = 'getByLabel("' + _esc(label) + '")'
     elif placeholder:
         loc.strategy = "placeholder"
         loc.placeholder = placeholder
-        loc.selector = 'getByPlaceholder("' + placeholder + '")'
+        loc.selector = 'getByPlaceholder("' + _esc(placeholder) + '")'
     elif role and name:
         loc.strategy = "role"
         loc.role = role
         loc.name = name
-        loc.selector = 'getByRole("' + role + '", name="' + name + '")'
+        loc.selector = 'getByRole("' + _esc(role) + '", name="' + _esc(name) + '")'
     elif name:
         loc.strategy = "text"
         loc.text = name[:60]
-        loc.selector = 'getByText("' + name[:60] + '")'
+        loc.selector = 'getByText("' + _esc(name[:60]) + '")'
     else:
         css = tag
         if css_class:

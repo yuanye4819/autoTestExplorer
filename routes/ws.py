@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from models.schemas import TaskStatus, WSMessage
 from state import tasks_store, ws_connections
-from services.db import _db_save_task
+from services.db import save_task
 
 router = APIRouter()
 
@@ -32,7 +32,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
             if data == "cancel" and task_id in tasks_store:
                 tasks_store[task_id].status = TaskStatus.CANCELLED
                 tasks_store[task_id].completed_at = datetime.now()
-                _db_save_task(tasks_store[task_id])
+                save_task(tasks_store[task_id])
 
     except WebSocketDisconnect:
         pass

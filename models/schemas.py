@@ -134,6 +134,8 @@ class WSMessage(BaseModel):
 class CreateTaskRequest(BaseModel):
     target_url: str
     requirements: str = ""
+    username: str = ""           # 可选：自动登录用户名
+    password: str = ""           # 可选：自动登录密码（仅内存使用，不持久化）
     max_steps: int = 30
 
 class TaskSummary(BaseModel):

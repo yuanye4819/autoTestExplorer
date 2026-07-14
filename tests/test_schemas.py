@@ -23,8 +23,8 @@ def test_task_result_defaults():
 
 def test_create_task_request_no_password():
     req = CreateTaskRequest(target_url="https://example.com")
-    assert not hasattr(req, "password")
-    assert not hasattr(req, "username")
+    assert req.password == ""    # defaults to empty string, not exposed in responses
+    assert req.username == ""
 
 def test_step_action_enum():
     assert StepAction.CLICK.value == "click"

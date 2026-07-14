@@ -8,13 +8,19 @@ from config import settings
 
 
 def setup_logging():
+    from logging.handlers import RotatingFileHandler
     settings.LOG_DIR.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(settings.LOG_DIR / "autotest.log", encoding="utf-8"),
+            RotatingFileHandler(
+                settings.LOG_DIR / "autotest.log",
+                maxBytes=5 * 1024 * 1024,  # 5MB
+                backupCount=3,
+                encoding="utf-8",
+            ),
         ],
     )
     return logging.getLogger("autotest")

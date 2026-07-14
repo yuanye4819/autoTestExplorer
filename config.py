@@ -42,8 +42,22 @@ class SecurityConfig(BaseSettings):
 
 
 class DatabaseConfig(BaseSettings):
-    """Database settings."""
-    URL: str = ""
+    """Database settings — supports MySQL and SQLite."""
+    ENGINE: str = "mysql"           # mysql | sqlite
+    HOST: str = "localhost"
+    PORT: int = 3306
+    USER: str = "root"
+    PASSWORD: str = ""              # must be set via env AUTOTEST_DATABASE__PASSWORD
+    NAME: str = "autotest"
+    URL: str = ""                   # 完整连接串（优先级最高）
+
+    @property
+    def connection_url(self) -> str:
+        if self.URL:
+            return self.URL
+        if self.ENGINE == "mysql":
+            return f"mysql+pymysql://{self.USER}:{self.PASSWORD}@{self.HOST}:{self.PORT}/{self.NAME}?charset=utf8mb4"
+        return f"sqlite:///{Path(__file__).parent / 'tasks.db'}"
 
 
 class Settings(BaseSettings):
@@ -99,7 +113,7 @@ class Settings(BaseSettings):
     @property
     def ALLOWED_DOMAINS(self): return self.security.ALLOWED_DOMAINS
     @property
-    def DATABASE_URL(self): return self.database.URL
+    def DATABASE_URL(self): return self.database.connection_url
 
     model_config = {"env_prefix": "AUTOTEST_", "env_file": ".env", "env_nested_delimiter": "__"}
 
@@ -111,4 +125,4 @@ settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 settings.LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Legacy: set DATABASE_URL for backward compat
-settings.database.URL = f"sqlite+aiosqlite:///{settings.PROJECT_ROOT}/data.db"
+# Database URL now configured via DatabaseConfig.connection_url

@@ -24,3 +24,12 @@ def generate_playwright_locator(locator: ElementLocator) -> str:
     if locator.xpath:
         return f'page.locator("xpath={_esc(locator.xpath)}")'
     return 'page.locator("body")'
+
+
+def is_password_field(locator: ElementLocator) -> bool:
+    """Check if this locator targets a password input."""
+    if not locator:
+        return False
+    keywords = ["password", "pass", "pwd", "密码"]
+    combined = (locator.name or "") + " " + (locator.label or "") + " " + (locator.placeholder or "") + " " + (locator.selector or "")
+    return any(kw in combined.lower() for kw in keywords)

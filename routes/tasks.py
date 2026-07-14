@@ -13,7 +13,7 @@ from models.schemas import (
 )
 from state import tasks_store, ws_connections, agent, test_runner
 from services.exploration import _guarded_exploration
-from services.db import _db_save_task
+from services.db import save_task
 
 router = APIRouter()
 
@@ -33,8 +33,8 @@ async def create_task(req: CreateTaskRequest):
     task = ExplorationTask(
         target_url=req.target_url,
         requirements=req.requirements,
-        username=None,
-        password=None,
+        username=req.username or None,
+        password=req.password or None,
         max_steps=req.max_steps,
     )
     result = TaskResult(task=task)
@@ -85,7 +85,7 @@ async def cancel_task(task_id: str):
     if result.status in (TaskStatus.EXPLORING, TaskStatus.PENDING):
         result.status = TaskStatus.CANCELLED
         result.completed_at = datetime.now()
-        _db_save_task(result)
+        save_task(result)
     return {"status": "cancelled"}
 
 
@@ -105,7 +105,7 @@ async def run_task_tests(task_id: str):
         result.execution_passed = exec_result["passed"]
         result.status = TaskStatus.COMPLETED
         result.completed_at = datetime.now()
-        _db_save_task(result)
+        save_task(result)
         if task_id in ws_connections:
             msg = WSMessage(type="execution_complete", task_id=task_id,
                             data={"passed": exec_result["passed"], "log": exec_result["log"][-2000:]})

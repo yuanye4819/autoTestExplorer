@@ -1413,6 +1413,7 @@ Return ONLY a numbered list, one feature per line. Format: "ModuleName: feature 
         # Generate site feature checklist
 
         checklist = self._generate_checklist(result)
+        result.checklist_content = checklist
 
         self.text_checklist.delete("1.0", "end")
 

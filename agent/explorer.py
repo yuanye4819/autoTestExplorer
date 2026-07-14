@@ -100,7 +100,8 @@ class WebExplorer:
         start = time.time()
         step = ExploreStep(index=len(self._steps), action=StepAction.NAVIGATE,
                            description=description or f"导航到 {url}", value=url)
-        # step starts
+        step.status = StepStatus.RUNNING
+        await self._emit_step(step)
 
         try:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT)
@@ -126,7 +127,8 @@ class WebExplorer:
         step = ExploreStep(index=len(self._steps), action=StepAction.CLICK,
                            description=description or f"点击 {locator.selector}",
                            locator=locator)
-        # step starts
+        step.status = StepStatus.RUNNING
+        await self._emit_step(step)
 
         try:
             element = await self._find_element(locator)
@@ -150,7 +152,8 @@ class WebExplorer:
         step = ExploreStep(index=len(self._steps), action=StepAction.FILL,
                            description=description or f"在 {locator.selector} 输入 '{value}'",
                            locator=locator, value=value)
-        # step starts
+        step.status = StepStatus.RUNNING
+        await self._emit_step(step)
 
         try:
             element = await self._find_element(locator)
@@ -180,7 +183,8 @@ class WebExplorer:
         step = ExploreStep(index=len(self._steps), action=StepAction.SELECT,
                            description=description or f"在 {locator.selector} 选择 '{value}'",
                            locator=locator, value=value)
-        # step starts
+        step.status = StepStatus.RUNNING
+        await self._emit_step(step)
 
         try:
             element = await self._find_element(locator)
@@ -203,7 +207,8 @@ class WebExplorer:
         step = ExploreStep(index=len(self._steps), action=StepAction.ASSERT_VISIBLE,
                            description=description or f"验证 {locator.selector} 可见",
                            locator=locator)
-        # step starts
+        step.status = StepStatus.RUNNING
+        await self._emit_step(step)
 
         try:
             element = await self._find_element(locator)
@@ -231,7 +236,8 @@ class WebExplorer:
         step = ExploreStep(index=len(self._steps), action=StepAction.ASSERT_TEXT,
                            description=description or f"验证页面包含 '{text}'",
                            value=text)
-        # step starts
+        step.status = StepStatus.RUNNING
+        await self._emit_step(step)
 
         try:
             content = await self.page.content()

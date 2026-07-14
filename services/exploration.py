@@ -90,7 +90,7 @@ async def _guarded_exploration(task_id: str):
 async def _run_exploration(task_id: str):
     """Complete exploration -> generate -> save pipeline for a single task."""
     from state import tasks_store, agent
-    from services.db import _db_save_task
+    from services.db import save_task
 
     result = tasks_store.get(task_id)
     if not result:
@@ -143,14 +143,14 @@ async def _run_exploration(task_id: str):
         # Phase 5: Mark complete
         result.status = TaskStatus.COMPLETED
         result.completed_at = datetime.now()
-        _db_save_task(result)
+        save_task(result)
         logger.info(f"[{task_id}] Task completed successfully")
 
     except asyncio.TimeoutError:
         result.status = TaskStatus.FAILED
         error_msg = "Exploration timed out — target may be unreachable or too slow"
         logger.error(f"[{task_id}] {error_msg}")
-        _db_save_task(result)
+        save_task(result)
         _broadcast_error(task_id, error_msg)
     except Exception as e:
         result.status = TaskStatus.FAILED
@@ -158,5 +158,5 @@ async def _run_exploration(task_id: str):
         error_msg = f"{type(e).__name__}: {e}"
         logger.error(f"[{task_id}] {error_msg}")
         logger.error(traceback.format_exc())
-        _db_save_task(result)
+        save_task(result)
         _broadcast_error(task_id, error_msg)
